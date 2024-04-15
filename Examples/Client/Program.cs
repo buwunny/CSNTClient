@@ -1,9 +1,9 @@
-using DNT4;
+﻿using DNT4;
 class TestClient {
 	public static void Main(string[] args)
 	{
 		// Create a client with a specific IP address
-		var client = new DNT4.Client("127.0.0.1", "Test");
+		var client = new Client("127.0.0.1", "Test");
 
 		// Connect the client
 		client.Connect();
