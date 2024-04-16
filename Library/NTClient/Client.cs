@@ -10,6 +10,8 @@ namespace NTClient
     private readonly string name = "Client";
     private ClientWebSocket? client;
 
+    private Subscriber[] subscribers = new Subscriber[0];
+
     public Client(string ip, string name)
     {
       this.ip = ip;
@@ -41,5 +43,54 @@ namespace NTClient
     }
 
     public bool IsConnected => client?.State == WebSocketState.Open;
+
+    public void Subscribe(Topic[] topics)
+    {
+      if (client == null) return;
+      Subscriber sub = new Subscriber();
+      subscribers.Append(sub);
+      sub.Topics = topics;
+      sub.Uid = GetNewUID();
+
+      SendJSON("subscribe", sub.ToSubscribe());
+    }
+    public byte[] ReceiveData()
+    {
+      if (client == null || !IsConnected) return null;
+      
+      var buffer = new byte[1024];
+      var result = client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None).GetAwaiter().GetResult();
+      
+      if (result.Count == 0)
+      {
+        return null;
+      }
+      
+      var data = new byte[result.Count];
+      Array.Copy(buffer, data, result.Count);
+      
+      return data;
+    }
+
+    public void SendJSON(string method, object parameters)
+    {
+      if (client == null || !IsConnected) return;
+      string json = $"{{\"method\":\"{method}\",\"params\":{parameters}}}";
+      byte[] bytes = Encoding.UTF8.GetBytes(json);
+      client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, default).Wait();
+    }
+
+    public void SendBinary(byte[] data)
+    {
+      if (client == null || !IsConnected) return;
+      client.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, default).Wait();
+    }
+
+
+    private int GetNewUID()
+    {
+      Random random = new Random();
+      return random.Next(99999999);
+    }
   }
 }

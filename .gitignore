@@ -1,3 +1,5 @@
+.mono
+
 # .NET build artifacts
 bin/
 obj/
