@@ -1,4 +1,5 @@
 ﻿using System.Net.WebSockets;
+using System.Text;
 
 namespace DNT4
 {
@@ -19,7 +20,7 @@ namespace DNT4
     {
       Console.WriteLine("Connecting to server...");
       client = new ClientWebSocket();
-      client.Options.AddSubProtocol("networktables.first.wpi.edu");
+      client.Options.AddSubProtocol("networktables.first.wpi.edu"); //v4.1.networktables.first.wpi.edu
       var address = $"ws://{ip}:{port}/nt/{name}";
       try{
         client.ConnectAsync(new Uri(address), default).Wait();
@@ -29,6 +30,14 @@ namespace DNT4
         return;
       }
       Console.WriteLine("Connected to server.");
+    }
+
+    public void Disconnect()
+    {
+      if (client == null) return;
+      client.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnected", default).Wait();
+      client.Dispose();
+      client = null;
     }
 
     public bool IsConnected => client?.State == WebSocketState.Open;
