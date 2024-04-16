@@ -1,4 +1,4 @@
-namespace DNT4
+﻿namespace NTClient
 {
   public class Topic {
     private string name = "";

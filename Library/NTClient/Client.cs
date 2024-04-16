@@ -1,7 +1,7 @@
-﻿using System.Net.WebSockets;
+using System.Net.WebSockets;
 using System.Text;
 
-namespace DNT4
+namespace NTClient
 {
   public class Client
   {

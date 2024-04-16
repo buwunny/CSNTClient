@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Library\DNT4\DNT4.csproj" />
+    <ProjectReference Include="..\..\Library\NTClient\NTClient.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
