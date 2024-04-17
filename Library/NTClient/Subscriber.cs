@@ -2,16 +2,16 @@ namespace NTClient
 {
   public class Subscriber
   {
-    private Topic[] topics = new Topic[0];
-    private int uid = -1;
+    private Topic[] topics;
+    private int uid;
     private SubscriptionOptions options = new SubscriptionOptions();
 
-    // public Subscriber(Topic[] topics, int uid, SubscriptionOptions options)
-    // {
-    //   this.topics = topics;
-    //   this.uid = uid;
-    //   this.options = options;
-    // }
+    public Subscriber(Topic[] topics, int uid, SubscriptionOptions options)
+    {
+      this.topics = topics;
+      this.uid = uid;
+      this.options = options;
+    }
 
     public Topic[] Topics
     {
@@ -31,32 +31,26 @@ namespace NTClient
       set { options = value; }
     }
 
-    public struct Subscribe
+    public Dictionary<string, object> ToSubscribe()
     {
-      public Topic[] topics;
-      public int subuid;
-      public SubscriptionOptions.Options options;
+      var subscribe = new Dictionary<string, object>
+      {
+        { "topics", topics},//topics.Select(t => t.Name).ToArray() },
+        { "subuid", uid },
+        { "options", options.ToOptions() }
+      };
+      return subscribe;
+
+;
     }
 
-    public Subscribe ToSubscribe()
+    public Dictionary<string, object> ToUnsubscribe()
     {
-      Subscribe sub = new Subscribe();
-      sub.topics = topics;
-      sub.subuid = uid;
-      sub.options = options.ToOptions();
-      return sub;
-    }
-
-    public struct Unsubscribe
-    {
-      public int subuid;
-    }
-
-    public Unsubscribe ToUnsubscribe()
-    {
-      Unsubscribe unsub = new Unsubscribe();
-      unsub.subuid = uid;
-      return unsub;
+      var unubscribe = new Dictionary<string, object>
+      {
+        { "subuid", uid },
+      };
+      return unubscribe;
     }
   }
 
@@ -67,22 +61,19 @@ namespace NTClient
     private bool topicsOnly = false;
     private bool prefix = false;
 
-    public struct Options
-    {
-      public double periodic;
-      public bool all;
-      public bool topicsOnly;
-      public bool prefix;
-    }
 
-    public Options ToOptions()
+
+    public Dictionary<string, object> ToOptions()
     {
-      Options opt = new Options();
-      opt.periodic = periodic;
-      opt.all = all;
-      opt.topicsOnly = topicsOnly;
-      opt.prefix = prefix;
-      return opt;
+      var options = new Dictionary<string, object>
+      {
+        { "periodic", periodic },
+        { "all", all },
+        { "topicsonly", topicsOnly },
+        { "prefix", prefix }
+      };
+
+      return options;
     }
   }
 }

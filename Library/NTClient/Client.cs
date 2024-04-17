@@ -1,5 +1,8 @@
 using System.Net.WebSockets;
+using System.Text.Json;
 using System.Text;
+
+using MessagePack;
 
 namespace NTClient
 {
@@ -10,7 +13,7 @@ namespace NTClient
     private readonly string name = "Client";
     private ClientWebSocket? client;
 
-    private Subscriber[] subscribers = new Subscriber[0];
+    private readonly Subscriber[] subscribers = Array.Empty<Subscriber>();
 
     public Client(string ip, string name)
     {
@@ -18,7 +21,7 @@ namespace NTClient
       this.name = name;
     }
 
-    public void Connect()
+    public async void Connect()
     {
       Console.WriteLine("Connecting to server...");
       client = new ClientWebSocket();
@@ -32,6 +35,7 @@ namespace NTClient
         return;
       }
       Console.WriteLine("Connected to server.");
+      await StartListener();
     }
 
     public void Disconnect()
@@ -47,37 +51,67 @@ namespace NTClient
     public void Subscribe(Topic[] topics)
     {
       if (client == null) return;
-      Subscriber sub = new Subscriber();
+      Subscriber sub = new Subscriber(topics, GetNewUID(), new SubscriptionOptions());
       subscribers.Append(sub);
-      sub.Topics = topics;
-      sub.Uid = GetNewUID();
-
       SendJSON("subscribe", sub.ToSubscribe());
     }
-    public byte[] ReceiveData()
+
+    public void Publish(Topic topic)
     {
-      if (client == null || !IsConnected) return null;
-      
-      var buffer = new byte[1024];
-      var result = client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None).GetAwaiter().GetResult();
-      
-      if (result.Count == 0)
+      topic.uid = GetNewUID();
+      SendJSON("publish", topic.ForPublish());
+    }
+
+    public void SendTimestamp()
+    {
+      long time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
+      var txData = new object[] { -1, 0, 1, time };
+      byte[] encodedData = MessagePackSerializer.Serialize(txData);
+      SendBinary(encodedData);
+    }
+
+    public async Task StartListener()
+    {
+      var buffer = new ArraySegment<byte>(new byte[1024]);
+      while (true)
       {
-        return null;
+        WebSocketReceiveResult result = await client?.ReceiveAsync(buffer, default);
+        if (result?.MessageType == WebSocketMessageType.Close)
+        {
+          Console.WriteLine("Connection closed by server.");
+          break;
+        }
+        else if (result?.MessageType == WebSocketMessageType.Binary)
+        {
+          Console.WriteLine("Received binary data.");
+          var t = MessagePackSerializer.Deserialize<object[]>(buffer.Array);
+          Console.WriteLine("Deserialized binary data: " + t[1]);
+        }
       }
-      
-      var data = new byte[result.Count];
-      Array.Copy(buffer, data, result.Count);
-      
-      return data;
     }
 
     public void SendJSON(string method, object parameters)
     {
       if (client == null || !IsConnected) return;
-      string json = $"{{\"method\":\"{method}\",\"params\":{parameters}}}";
+      Dictionary<string, object> message = new Dictionary<string, object>
+      {
+        { "method", method },
+        { "params", parameters }
+      };
+      string json = JsonSerializer.Serialize(message);
+      // string json = $"{{\"method\":\"{method}\",\"params\":{parameters}}}";
+      Console.WriteLine($"Sending: {json}");
       byte[] bytes = Encoding.UTF8.GetBytes(json);
-      client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, default).Wait();
+
+      try
+      {
+        client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, default).Wait();
+        Console.WriteLine("SendJSON succeeded.");
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"SendJSON failed: {ex.Message}");
+      }
     }
 
     public void SendBinary(byte[] data)
@@ -86,8 +120,7 @@ namespace NTClient
       client.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, default).Wait();
     }
 
-
-    private int GetNewUID()
+    private static int GetNewUID()
     {
       Random random = new Random();
       return random.Next(99999999);

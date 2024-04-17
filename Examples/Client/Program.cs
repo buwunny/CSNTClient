@@ -9,14 +9,15 @@ class TestClient {
     client.Connect();
     
     // Subscribe to a topic
-    Topic topic = new Topic { Name = "TestTopic" };
-    client.Subscribe(new Topic[] { topic });
+    Topic topic = new Topic ();
+    topic.name = "Test";
+    // client.Subscribe([topic]);
+    client.Publish(topic);
 		while (client.IsConnected)
 		{
 			// Print the connection status
-			Console.WriteLine("IsConnected: " + client.IsConnected);
-      Console.WriteLine("Data" + client.ReceiveData());
-
+			// Console.WriteLine("IsConnected: " + client.IsConnected);
+      // client.SendTimestamp();
 			// Wait for half a second
 			Thread.Sleep(500);
 		}
