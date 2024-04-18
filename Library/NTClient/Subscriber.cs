@@ -1,6 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
-
 namespace NTClient
 {
   public class Subscriber
@@ -41,18 +38,19 @@ namespace NTClient
       set { options = value; }
     }
 
-    public Dictionary<string, object> ForSubscribe()
+    public Dictionary<string, object> ForSubscribe(bool includeOptions = false)
     {
       var subscribe = new Dictionary<string, object>
       {
-        { "topics", topics},
-        { "subuid", uid },
-        { "options", options.ToOptions() }
+      { "topics", topics},
+      { "subuid", uid }
       };
-      Console.WriteLine(subscribe["topics"]);
-      return subscribe;
 
-;
+      if (includeOptions)
+      {
+      subscribe.Add("options", options.ToOptions());
+      }
+      return subscribe;
     }
 
     public Dictionary<string, object> ForUnsubscribe()
