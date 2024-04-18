@@ -138,7 +138,7 @@ namespace NTClient
       }
       catch (Exception ex)
       {
-        Log($"ERROR SendJSON failed: {ex.Message}");
+        Log($"ERROR: SendJSON failed: {ex.Message}");
       }
     }
 
@@ -161,8 +161,14 @@ namespace NTClient
         }
         else if (result?.MessageType == WebSocketMessageType.Text)
         {
-          string message = Encoding.UTF8.GetString(buffer.Array ?? Array.Empty<byte>(), 0, result.Count);
-          HandleJson(message);
+          if (buffer.Array != null)
+          {
+            HandleJson(buffer.Array, result.Count);
+          }
+          else
+          {
+            Log("Received empty text message.");
+          }
         }
         else if (result?.MessageType == WebSocketMessageType.Binary)
         {
@@ -172,9 +178,88 @@ namespace NTClient
       }
     }
 
-    private void HandleJson (string json)
+    private void HandleJson (byte[] bytes, int count)
     {
-      Log("Received JSON: " + json);
+      try 
+      {
+        string text = Encoding.UTF8.GetString(bytes, 0, count);
+        JsonDocument jsonDocument = JsonDocument.Parse(text);
+        
+        if (jsonDocument.RootElement.ValueKind != JsonValueKind.Array)
+        {
+          throw new Exception(@"
+            Recieved a non-array of JSON objects.
+            ""Each WebSockets text data frame shall consist of a list of JSON objects.""
+            https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc#text-frames"
+          );
+        }
+
+        foreach (JsonElement json in jsonDocument.RootElement.EnumerateArray())
+        {
+          //Validate JSON
+          if (json.ValueKind != JsonValueKind.Object){
+            Log("Ignoring message: JSON is not an object.");
+            return;
+          }
+          // Validate "method" key
+          if (json.TryGetProperty("method", out JsonElement method))
+          {
+            if (method.ValueKind != JsonValueKind.String)
+            {
+              Log("Ignoring message: JSON value of \"method\" is not a string.");
+              return;
+            }
+            else
+            {
+              string? methodString = method.GetString();
+              if (methodString is null)
+              {
+                Log("Ignoring message: JSON value of \"method\" is null.");
+                return;
+              }
+              if (methodString != "announce" && methodString != "unannounce" && methodString != "properties")
+              {
+                Log($"Ignoring message: Unknown method \"{methodString}\".");
+                return;
+              }
+            }
+          }
+          else
+          {
+            Log("Ignoring message: JSON does not contain a \"method\" key.");
+            return;
+          }
+
+          // Validate "params" key
+          if (json.TryGetProperty("params", out JsonElement parameters))
+          {
+            if (parameters.ValueKind != JsonValueKind.Object)
+            {
+              Log("Ignoring message: JSON value of \"params\" is not an object.");
+              return;
+            }
+          }
+          else
+          {
+            Log("Ignoring message: JSON does not contain a \"params\" key.");
+            return;
+          }
+
+          // TODO: Handle different methods
+          // if (method.GetString() == "announce")
+          // {}
+          // else if (method.GetString() == "unannounce")
+          // {}
+          // else if (method.GetString() == "properties")
+          // {}
+          Log($"Received JSON: {json}");
+        }
+      }
+      catch (Exception e)
+      {
+        Log($"ERROR: Failed to parse JSON: {e.Message}");
+        return;
+      }
     }
 
     private void HandleBinary (object[] data)
@@ -186,7 +271,7 @@ namespace NTClient
 
     private void Log(string message)
     {
-      Console.WriteLine($"[{DateTime.Now:HH:mm:ss}][{name}] {message}");
+      Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [{name}] {message}");
     }
     private static int GetNewUID()
     {
