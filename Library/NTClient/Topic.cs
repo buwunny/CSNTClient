@@ -7,7 +7,7 @@
     private Dictionary<string, object> properties = new Dictionary<string, object>();
 
     
-     public Topic(string name , int uid, string type, Dictionary<string, object> properties)
+    public Topic(string name , int uid, string type, Dictionary<string, object> properties)
     {
       this.name = name;
       this.uid = uid;
@@ -41,8 +41,8 @@
       get { return properties; }
       set { properties = value; }
     }
-   
-    public Dictionary<string, object> ForPublish()
+
+    public Dictionary<string, object> GetPublishObject()
     {
       Dictionary<string, object> dict = new Dictionary<string, object>()
       {
@@ -54,7 +54,7 @@
       return dict;
     }
 
-    public Dictionary<string, int> ForUnpublish()
+    public Dictionary<string, int> GetUnpublishObject()
     {
       Dictionary<string, int> dict = new Dictionary<string, int>()
       {

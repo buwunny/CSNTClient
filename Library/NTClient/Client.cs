@@ -13,7 +13,10 @@ namespace NTClient
     private readonly string name = "NT4";
     private ClientWebSocket client;
 
-    private readonly Subscriber[] subscribers = Array.Empty<Subscriber>();
+    private Topic[] clientTopics = [];
+    private Topic[] serverTopics = [];
+
+    private Subscriber[] subscribers = [];
 
     public Client(string ip, string clientName)
     {
@@ -35,7 +38,7 @@ namespace NTClient
         return;
       }
       Log("Connected to server.");
-      await StartListener();
+      await WebsocketListener();
     }
 
     public void Disconnect()
@@ -52,14 +55,59 @@ namespace NTClient
       if (client == null) return;
       Subscriber sub = new Subscriber(topic, GetNewUID(), new SubscriptionOptions());
       subscribers.Append(sub);
-      SendJson("subscribe", sub.ForSubscribe());
+      SendJson("subscribe", sub.GetSubscribeObject());
       Log("Subscribed to topic: \"" + topic + "\"");
     }
 
-    public void Publish(Topic topic)
+    public void Unsubscribe(int subuid)
     {
-      topic.Uid = GetNewUID();
-      SendJson("publish", topic.ForPublish());
+      if (client == null) return;
+      Subscriber? sub = subscribers.FirstOrDefault(s => s.Uid == subuid);
+      if (sub == null)
+      {
+        Log($"Subscriber with UID {subuid} not found.");
+        return;
+      };
+      SendJson("unsubscribe", sub.GetUnsubscribeObject());
+      Log("Unsubscribed from topic: \"" + sub.Topics[0] + "\"");
+      subscribers = subscribers.Where(s => s.Uid != subuid).ToArray();
+    }
+
+    public void Publish(string type, string topic)
+    {
+      Topic newTopic = new Topic();
+      newTopic.Name = topic;
+      newTopic.Uid = GetNewUID();
+      newTopic.Type = type;
+      SendJson("publish", newTopic.GetPublishObject());
+      clientTopics.Append(newTopic);
+    }
+
+    public void Unpublish(string topic)
+    {
+      Topic? newTopic = clientTopics.FirstOrDefault(t => t.Name == topic);
+
+      if (newTopic == null)
+      {
+        Log($"Topic with name \"{topic}\" not found.");
+        return;
+      };
+      SendJson("unpublish", newTopic.GetUnpublishObject());
+    }
+
+    public void SetProperties(string topic, Dictionary<string, object> properties)
+    {
+      var clientTopic = clientTopics.FirstOrDefault(t => t.Name == topic);
+      var serverTopic = serverTopics.FirstOrDefault(t => t.Name == topic);
+      if (clientTopic != null)
+      {
+        clientTopic.Properties = properties;
+      }
+      if (serverTopic != null)
+      {
+        serverTopic.Properties = properties;
+      }
+      SendJson("setproperties", new Dictionary<string, object> { { "name", topic }, { "update", properties } });
     }
 
     private void SendTimestamp()
@@ -100,7 +148,7 @@ namespace NTClient
       client.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, default).Wait();
     }
 
-    private async Task StartListener()
+    private async Task WebsocketListener()
     {
       var buffer = new ArraySegment<byte>(new byte[1024]);
       while (true)

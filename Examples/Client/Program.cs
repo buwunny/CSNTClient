@@ -12,7 +12,7 @@ class TestClient {
     client.Subscribe("");
     // client.Subscribe("/datatable/x");
 		
-		client.Publish(new Topic());
+		client.Publish("string", "TestTopic");
 		while (client.IsConnected)
 		{
 			// client.SendTimestamp();

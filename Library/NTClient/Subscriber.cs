@@ -38,7 +38,7 @@ namespace NTClient
       set { options = value; }
     }
 
-    public Dictionary<string, object> ForSubscribe(bool includeOptions = false)
+    public Dictionary<string, object> GetSubscribeObject(bool includeOptions = false)
     {
       var subscribe = new Dictionary<string, object>
       {
@@ -53,7 +53,7 @@ namespace NTClient
       return subscribe;
     }
 
-    public Dictionary<string, object> ForUnsubscribe()
+    public Dictionary<string, object> GetUnsubscribeObject()
     {
       var unubscribe = new Dictionary<string, object>
       {
