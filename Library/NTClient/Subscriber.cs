@@ -1,19 +1,29 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
 namespace NTClient
 {
   public class Subscriber
   {
-    private Topic[] topics;
+    private string[] topics;
     private int uid;
     private SubscriptionOptions options = new SubscriptionOptions();
 
-    public Subscriber(Topic[] topics, int uid, SubscriptionOptions options)
+    public Subscriber(string[] topics, int uid, SubscriptionOptions options)
     {
       this.topics = topics;
       this.uid = uid;
       this.options = options;
     }
 
-    public Topic[] Topics
+    public Subscriber(string topic, int uid, SubscriptionOptions options)
+    {
+      topics = [topic];
+      this.uid = uid;
+      this.options = options;
+    }
+
+    public string[] Topics
     {
       get { return topics; }
       set { topics = value; }
@@ -31,20 +41,21 @@ namespace NTClient
       set { options = value; }
     }
 
-    public Dictionary<string, object> ToSubscribe()
+    public Dictionary<string, object> ForSubscribe()
     {
       var subscribe = new Dictionary<string, object>
       {
-        { "topics", topics},//topics.Select(t => t.Name).ToArray() },
+        { "topics", topics},
         { "subuid", uid },
         { "options", options.ToOptions() }
       };
+      Console.WriteLine(subscribe["topics"]);
       return subscribe;
 
 ;
     }
 
-    public Dictionary<string, object> ToUnsubscribe()
+    public Dictionary<string, object> ForUnsubscribe()
     {
       var unubscribe = new Dictionary<string, object>
       {

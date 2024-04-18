@@ -7,14 +7,15 @@ class TestClient {
 
 		// Connect the client
     client.Connect();
-    
-    // Subscribe to a topic
-    Topic topic = new Topic ();
-    topic.name = "Test";
+ 
     // client.Subscribe([topic]);
-    client.Publish(topic);
+    client.Subscribe("");
+    // client.Subscribe("/datatable/x");
+		
+		client.Publish(new Topic());
 		while (client.IsConnected)
 		{
+			// client.SendTimestamp();
 			// Print the connection status
 			// Console.WriteLine("IsConnected: " + client.IsConnected);
       // client.SendTimestamp();
