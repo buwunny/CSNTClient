@@ -1,7 +1,7 @@
 ﻿namespace NTClient
 {
   public class Topic {
-    private int topicId = 0;
+    private int id = 0; // 
     private string name = "";
     private int pubUid = -1;
     private string type = "string";
@@ -19,10 +19,10 @@
     {
     }
 
-    public int TopicId
+    public int Id
     {
-      get { return topicId; }
-      set { topicId = value; }
+      get { return id; }
+      set { id = value; }
     }
 
     public string Name

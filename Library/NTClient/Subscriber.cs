@@ -38,18 +38,15 @@ namespace NTClient
       set { options = value; }
     }
 
-    public Dictionary<string, object> GetSubscribeObject(bool includeOptions = true)
+    public Dictionary<string, object> GetSubscribeObject()
     {
       var subscribe = new Dictionary<string, object>
       {
       { "topics", topics},
-      { "subuid", uid }
+      { "subuid", uid },
+      { "options", options }
       };
-
-      if (includeOptions)
-      {
-      subscribe.Add("options", options);
-      }
+    
       return subscribe;
     }
 

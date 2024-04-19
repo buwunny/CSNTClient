@@ -13,8 +13,8 @@ namespace NTClient
     private readonly string name = "NT4";
     private readonly ClientWebSocket client;
 
-    private Dictionary<int, Topic> clientTopics = new Dictionary<int, Topic>();
-    private Dictionary<int, Topic> serverTopics = new Dictionary<int, Topic>();
+    private Topic[] clientTopics = [];
+    private Topic[] serverTopics = [];
     // {serverTopicID : Topic}
     
     private Subscriber[] subscribers = [];
@@ -49,36 +49,50 @@ namespace NTClient
       client.Dispose();
     }
 
+    public void Reconnect()
+    {
+
+    }
+
     public bool IsConnected => client?.State == WebSocketState.Open;
 
-    public void Subscribe(string topic)
+    private async Task WebsocketListener()
     {
-      if (client == null) return;
-      Subscriber sub = new Subscriber([topic], GetNewUID(), new SubscriptionOptions());
-      subscribers.Append(sub);
-      SendJson("subscribe", sub.GetSubscribeObject());
-      Log("Subscribed to topic: \"" + topic + "\"");
-    }
-
-    public void Unsubscribe(int uid)
-    {
-      if (client == null) return;
-      Subscriber? sub = subscribers.FirstOrDefault(s => s.Uid == uid);
-      if (sub == null)
+      var buffer = new ArraySegment<byte>(new byte[1024]);
+      while (true)
       {
-        Log($"Subscriber with UID {uid} not found.");
-        return;
-      };
-      SendJson("unsubscribe", sub.GetUnsubscribeObject());
-      Log("Unsubscribed from topic: \"" + sub.Topics[0] + "\"");
-      subscribers = subscribers.Where(s => s.Uid != uid).ToArray();
+        WebSocketReceiveResult result = await client.ReceiveAsync(buffer, default);
+        if (result?.MessageType == WebSocketMessageType.Close)
+        {
+          Log($"Connection closed by server [{ip}].");
+          break;
+        }
+        else if (buffer.Array != null)
+        {
+          if (result?.MessageType == WebSocketMessageType.Text)
+          {
+            HandleJson(buffer.Array, result.Count);
+          }
+          else if (result?.MessageType == WebSocketMessageType.Binary)
+          {
+            HandleBinary(buffer.Array);
+          }
+        }
+      }
     }
 
+    private async Task WebsocketSender()
+    {
+    }
+
+    // CLIENT -> SERVER
+
+    // Publish Messages (Client to Server)
     public void Publish(string type, string topic)
     {
       Topic newTopic = new Topic();
       newTopic.Name = topic;
-      newTopic.Uid = GetNewUID();
+      newTopic.PubUid = GetNewUID();
       newTopic.Type = type;
       SendJson("publish", newTopic.GetPublishObject());
       clientTopics.Append(newTopic);
@@ -109,6 +123,29 @@ namespace NTClient
         serverTopic.Properties = properties;
       }
       SendJson("setproperties", new Dictionary<string, object> { { "name", topic }, { "update", properties } });
+    }
+    
+    public void Subscribe(string topic)
+    {
+      if (client == null) return;
+      Subscriber sub = new Subscriber([topic], GetNewUID(), new SubscriptionOptions());
+      subscribers.Append(sub);
+      SendJson("subscribe", sub.GetSubscribeObject());
+      Log("Subscribed to topic: \"" + topic + "\"");
+    }
+
+    public void Unsubscribe(int uid)
+    {
+      if (client == null) return;
+      Subscriber? sub = subscribers.FirstOrDefault(s => s.Uid == uid);
+      if (sub == null)
+      {
+        Log($"Subscriber with UID {uid} not found.");
+        return;
+      };
+      SendJson("unsubscribe", sub.GetUnsubscribeObject());
+      Log("Unsubscribed from topic: \"" + sub.Topics[0] + "\"");
+      subscribers = subscribers.Where(s => s.Uid != uid).ToArray();
     }
 
     private void SendTimestamp()
@@ -149,30 +186,14 @@ namespace NTClient
       client.SendAsync(new ArraySegment<byte>(data), WebSocketMessageType.Binary, true, default).Wait();
     }
 
-    private async Task WebsocketListener()
-    {
-      var buffer = new ArraySegment<byte>(new byte[1024]);
-      while (true)
-      {
-        WebSocketReceiveResult result = await client.ReceiveAsync(buffer, default);
-        if (result?.MessageType == WebSocketMessageType.Close)
-        {
-          Log($"Connection closed by server [{ip}].");
-          break;
-        }
-        else if (buffer.Array != null)
-        {
-          if (result?.MessageType == WebSocketMessageType.Text)
-          {
-            HandleJson(buffer.Array, result.Count);
-          }
-          else if (result?.MessageType == WebSocketMessageType.Binary)
-          {
-            HandleBinary(buffer.Array);
-          }
-        }
-      }
-    }
+    // SERVER -> CLIENT
+    private void HandleAnnounce() {}
+
+    private void HandleUnannounce() {}
+
+    private void HandleProperties() {}
+
+    private void HandleRtt() {}
 
     private void HandleJson (byte[] bytes, int count)
     {
@@ -239,31 +260,41 @@ namespace NTClient
           }
 
           // TODO: Handle different methods
-          if (method.GetString() == "announce")
-          {
-            string name = parameters.GetProperty("name").GetString();
-            int pubUid = parameters.TryGetProperty("pubuid") ? parameters.GetProperty("pubuid").GetInt32() : 0;
-            string type = parameters.GetProperty("type").GetString();
-            Dictionary<string, object> properties = parameters.GetProperty("properties").ToObject<Dictionary<string, object>>();
-            Topic announcedTopic = new Topic(name, pubUid, type, properties);
-  
-            serverTopics[parameters.GetProperty("id").GetInt32()] = announcedTopic;
-          }
-          else if (method.GetString() == "unannounce")
-          {
-            if (serverTopics.ContainsKey(id))
-            {
-              serverTopics.Remove(id);
-            }
-            else
-            {
-              Log($"Ignoring message: serverTopic with ID {id} not found.");
-            }
-          }
-          else if (method.GetString() == "properties")
-          {
+          // if (method.GetString() == "announce")
+          // {
+          //   string? name = parameters.GetProperty("name").GetString();
+          //   int id = parameters.GetProperty("id").GetInt32();
+          //   string? type = parameters.GetProperty("type").GetString();
+          //   int pubUid = parameters.TryGetProperty("pubuid", out JsonElement pubUidElement) ? pubUidElement.GetInt32() : 0;
+          //   Dictionary<string, object>? properties = JsonSerializer.Deserialize<Dictionary<string, object>>(parameters.GetProperty("properties").GetRawText());
             
-          }
+          //   if (name is null || type is null || properties is null)
+          //   {
+          //     Log("Ignoring message: JSON does not contain a valid \"name\", \"type\", or \"properties\" key.");
+          //     return;
+          //   }
+          //   Topic announcedTopic = new Topic(name, pubUid, type, properties);
+
+          //   serverTopics[parameters.GetProperty("id").GetInt32()] = announcedTopic;
+          // }
+          // else if (method.GetString() == "unannounce")
+          // {
+
+          //   int id = parameters.GetProperty("id").GetInt32();
+          //   if (serverTopics.Any(topic => topic.ServerTopicId == id))
+          //   {
+          //     // Code to handle when a topic with the given id exists in serverTopics
+          //     serverTopics.(id);
+          //   }
+          //   else
+          //   {
+          //     Log($"Ignoring message: serverTopic with ID {id} not found.");
+          //   }
+          // }
+          // else if (method.GetString() == "properties")
+          // {
+            
+          // }
           Log($"Received JSON: {json}");
         }
       }
@@ -343,7 +374,7 @@ namespace NTClient
         }
 
         Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
-        if (serverTopics.Any(t => t.Uid == topicId))
+        if (serverTopics.Any(t => t.PubUid == topicId))
         {
           Log("in server topics");
         }
@@ -362,6 +393,7 @@ namespace NTClient
     }
     
 
+    // UTILS
     private void Log(string message)
     {
       Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [{name}] {message}");
