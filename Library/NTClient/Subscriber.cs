@@ -4,20 +4,20 @@ namespace NTClient
   {
     private string[] topics;
     private int uid;
-    private SubscriptionOptions options = new SubscriptionOptions();
+    private SubscriptionOptions options;
 
-    public Subscriber(string[] topics, int uid, SubscriptionOptions options)
+    public Subscriber(string[] topicNames, int uid, SubscriptionOptions options)
     {
-      this.topics = topics;
+      this.topics = topicNames;
       this.uid = uid;
       this.options = options;
     }
 
-    public Subscriber(string topic, int uid, SubscriptionOptions options)
+    public Subscriber(string[] topicNames, int uid)
     {
-      topics = [topic];
+      this.topics = topicNames;
       this.uid = uid;
-      this.options = options;
+      this.options = new SubscriptionOptions();
     }
 
     public string[] Topics
@@ -38,7 +38,7 @@ namespace NTClient
       set { options = value; }
     }
 
-    public Dictionary<string, object> GetSubscribeObject(bool includeOptions = false)
+    public Dictionary<string, object> GetSubscribeObject(bool includeOptions = true)
     {
       var subscribe = new Dictionary<string, object>
       {
@@ -48,7 +48,7 @@ namespace NTClient
 
       if (includeOptions)
       {
-      subscribe.Add("options", options.ToOptions());
+      subscribe.Add("options", options);
       }
       return subscribe;
     }
@@ -70,19 +70,40 @@ namespace NTClient
     private bool topicsOnly = false;
     private bool prefix = false;
 
-
-
-    public Dictionary<string, object> ToOptions()
+    public SubscriptionOptions(double periodic, bool all, bool topicsOnly, bool prefix)
     {
-      var options = new Dictionary<string, object>
-      {
-        { "periodic", periodic },
-        { "all", all },
-        { "topicsonly", topicsOnly },
-        { "prefix", prefix }
-      };
+      this.periodic = periodic;
+      this.all = all;
+      this.topicsOnly = topicsOnly;
+      this.prefix = prefix;
+    }
 
-      return options;
+    public SubscriptionOptions()
+    {
+    }
+
+    public double Periodic
+    {
+      get { return periodic; }
+      set { periodic = value; }
+    }
+
+    public bool All
+    {
+      get { return all; }
+      set { all = value; }
+    }
+
+    public bool TopicsOnly
+    {
+      get { return topicsOnly; }
+      set { topicsOnly = value; }
+    }
+
+    public bool Prefix
+    {
+      get { return prefix; }
+      set { prefix = value; }
     }
   }
 }

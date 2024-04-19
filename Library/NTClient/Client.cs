@@ -11,7 +11,7 @@ namespace NTClient
     private readonly int port = 5810; // Default NT4 port
     private readonly string ip = "localhost"; // Default NT4 address
     private readonly string name = "NT4";
-    private ClientWebSocket client;
+    private readonly ClientWebSocket client;
 
     private Topic[] clientTopics = [];
     private Topic[] serverTopics = [];
@@ -53,24 +53,24 @@ namespace NTClient
     public void Subscribe(string topic)
     {
       if (client == null) return;
-      Subscriber sub = new Subscriber(topic, GetNewUID(), new SubscriptionOptions());
+      Subscriber sub = new Subscriber([topic], GetNewUID(), new SubscriptionOptions());
       subscribers.Append(sub);
       SendJson("subscribe", sub.GetSubscribeObject());
       Log("Subscribed to topic: \"" + topic + "\"");
     }
 
-    public void Unsubscribe(int subuid)
+    public void Unsubscribe(int uid)
     {
       if (client == null) return;
-      Subscriber? sub = subscribers.FirstOrDefault(s => s.Uid == subuid);
+      Subscriber? sub = subscribers.FirstOrDefault(s => s.Uid == uid);
       if (sub == null)
       {
-        Log($"Subscriber with UID {subuid} not found.");
+        Log($"Subscriber with UID {uid} not found.");
         return;
       };
       SendJson("unsubscribe", sub.GetUnsubscribeObject());
       Log("Unsubscribed from topic: \"" + sub.Topics[0] + "\"");
-      subscribers = subscribers.Where(s => s.Uid != subuid).ToArray();
+      subscribers = subscribers.Where(s => s.Uid != uid).ToArray();
     }
 
     public void Publish(string type, string topic)
@@ -121,6 +121,7 @@ namespace NTClient
     private void SendJson(string method, object parameters)
     {
       if (client == null || !IsConnected) return;
+      
       List<object> message = new List<object>
       {
         new Dictionary<string, object>
@@ -131,7 +132,6 @@ namespace NTClient
       };
       string json = JsonSerializer.Serialize(message);
       byte[] bytes = Encoding.UTF8.GetBytes(json);
-
       try
       {
         client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, default).Wait();
