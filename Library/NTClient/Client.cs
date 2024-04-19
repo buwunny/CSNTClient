@@ -13,9 +13,10 @@ namespace NTClient
     private readonly string name = "NT4";
     private readonly ClientWebSocket client;
 
-    private Topic[] clientTopics = [];
-    private Topic[] serverTopics = [];
-
+    private Dictionary<int, Topic> clientTopics = new Dictionary<int, Topic>();
+    private Dictionary<int, Topic> serverTopics = new Dictionary<int, Topic>();
+    // {serverTopicID : Topic}
+    
     private Subscriber[] subscribers = [];
 
     public Client(string ip, string clientName)
@@ -238,12 +239,31 @@ namespace NTClient
           }
 
           // TODO: Handle different methods
-          // if (method.GetString() == "announce")
-          // {}
-          // else if (method.GetString() == "unannounce")
-          // {}
-          // else if (method.GetString() == "properties")
-          // {}
+          if (method.GetString() == "announce")
+          {
+            string name = parameters.GetProperty("name").GetString();
+            int pubUid = parameters.TryGetProperty("pubuid") ? parameters.GetProperty("pubuid").GetInt32() : 0;
+            string type = parameters.GetProperty("type").GetString();
+            Dictionary<string, object> properties = parameters.GetProperty("properties").ToObject<Dictionary<string, object>>();
+            Topic announcedTopic = new Topic(name, pubUid, type, properties);
+  
+            serverTopics[parameters.GetProperty("id").GetInt32()] = announcedTopic;
+          }
+          else if (method.GetString() == "unannounce")
+          {
+            if (serverTopics.ContainsKey(id))
+            {
+              serverTopics.Remove(id);
+            }
+            else
+            {
+              Log($"Ignoring message: serverTopic with ID {id} not found.");
+            }
+          }
+          else if (method.GetString() == "properties")
+          {
+            
+          }
           Log($"Received JSON: {json}");
         }
       }
