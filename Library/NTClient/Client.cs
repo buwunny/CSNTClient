@@ -159,21 +159,16 @@ namespace NTClient
           Log($"Connection closed by server [{ip}].");
           break;
         }
-        else if (result?.MessageType == WebSocketMessageType.Text)
+        else if (buffer.Array != null)
         {
-          if (buffer.Array != null)
+          if (result?.MessageType == WebSocketMessageType.Text)
           {
             HandleJson(buffer.Array, result.Count);
           }
-          else
+          else if (result?.MessageType == WebSocketMessageType.Binary)
           {
-            Log("Received empty text message.");
+            HandleBinary(buffer.Array);
           }
-        }
-        else if (result?.MessageType == WebSocketMessageType.Binary)
-        {
-          object[] t = MessagePackSerializer.Deserialize<object[]>(buffer.Array);
-          HandleBinary(t);
         }
       }
     }
@@ -187,11 +182,8 @@ namespace NTClient
         
         if (jsonDocument.RootElement.ValueKind != JsonValueKind.Array)
         {
-          throw new Exception(@"
-            Recieved a non-array of JSON objects.
-            ""Each WebSockets text data frame shall consist of a list of JSON objects.""
-            https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc#text-frames"
-          );
+          Log("Ignoring message: Recieved a non-array of JSON objects.");
+          return;
         }
 
         foreach (JsonElement json in jsonDocument.RootElement.EnumerateArray())
@@ -262,10 +254,91 @@ namespace NTClient
       }
     }
 
-    private void HandleBinary (object[] data)
+    private void HandleBinary (byte[] bytes)
     {
-      Log($"Received binary data: {data[0]} {data[1]} {data[2]} {data[3]}");
-      
+      try
+      {
+        object[] data = MessagePackSerializer.Deserialize<object[]>(bytes);
+        
+        // Validate MessagePack data
+        if (data.Length != 4)
+        {
+          Log("Ignoring message: MessagePack data does not contain 4 elements.");
+          return;
+        }
+
+
+        Dictionary<int, Type> intToType = new()
+        {
+          { 0, typeof(bool) },
+          { 1, typeof(double) },
+          { 2, typeof(int) },
+          { 3, typeof(float) },
+          { 4, typeof(string) },
+          { 5, typeof(byte[]) },
+          { 16, typeof(bool[]) },
+          { 17, typeof(double[]) },
+          { 18, typeof(int[]) },
+          { 19, typeof(float[]) },
+          { 20, typeof(string[]) }
+        };
+
+        int topicId;
+        int timestamp;
+        int dataType;
+        var dataValue = data[3];
+
+        if (data[0] is sbyte sbyteTopicId)
+        {
+          topicId = sbyteTopicId;
+        }
+        else if (data[0] is byte byteTopicId)
+        {
+          topicId = byteTopicId;
+        }
+        else
+        {
+          Log($"Ignoring message: topicId is an invalid type ({data[0].GetType()}).");
+          return;
+        }
+
+        if (data[1] is uint uintTimestamp)
+        {
+          timestamp = (int)uintTimestamp;
+        }
+        else
+        {
+          Log($"Ignoring message: timestamp is an invalid type ({data[1].GetType()}).");
+          return;
+        }
+
+        if (data[2] is byte byteDataType)
+        {
+          dataType = byteDataType;
+        }
+        else
+        {
+          Log($"Ignoring message: dataType is an invalid type ({data[2].GetType()}).");
+          return;
+        }
+
+        Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
+        if (serverTopics.Any(t => t.Uid == topicId))
+        {
+          Log("in server topics");
+        }
+        else if (topicId == -1)
+        {
+          // handleRtt()
+        }
+        // Code block to handle valid data
+        Log($"Received binary data: {data[0]} {data[1]} {data[2]} {data[3]}");
+      }
+      catch (Exception e)
+      {
+        Log($"ERROR: Failed to deserialize MessagePack data: {e.Message}");
+        return;
+      }
     }
     
 
