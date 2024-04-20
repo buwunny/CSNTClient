@@ -74,6 +74,18 @@ namespace NTClient
       SendBinary(data);
     }
 
+    public object? GetTopicValue(string topic)
+    {
+      Topic? serverTopic = serverTopics.FirstOrDefault(t => t.Name == topic);
+      if (serverTopic == null)
+      {
+        Log($"Topic with name \"{topic}\" not found.");
+        return null;
+      }
+
+      return serverTopic.Value;
+    }
+
     private async Task WebsocketListener()
     {
       var buffer = new ArraySegment<byte>(new byte[1024]);
@@ -143,13 +155,13 @@ namespace NTClient
       SendJson("setproperties", new Dictionary<string, object> { { "name", topic }, { "update", properties } });
     }
     
-    public void Subscribe(string topic)
+    public void Subscribe(string[] topics)
     {
       if (client == null) return;
-      Subscriber sub = new Subscriber([topic], GetNewUID(), new SubscriptionOptions());
+      Subscriber sub = new Subscriber(topics, GetNewUID(), new SubscriptionOptions());
       subscribers.Append(sub);
       SendJson("subscribe", sub.GetSubscribeObject());
-      Log("Subscribed to topic: \"" + topic + "\"");
+      Log("Subscribed to topic(s): \"" + string.Join(", ", topics) + "\"");
     }
 
     public void Unsubscribe(int uid)
@@ -190,6 +202,7 @@ namespace NTClient
       byte[] bytes = Encoding.UTF8.GetBytes(json);
       try
       {
+        Log($"Sending JSON: {json}");
         client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, default).Wait();
       }
       catch (Exception ex)
@@ -211,7 +224,7 @@ namespace NTClient
         string? name = parameters.GetProperty("name").GetString();
         int id = parameters.GetProperty("id").GetInt32();
         string? type = parameters.GetProperty("type").GetString();
-        int pubuid = parameters.GetProperty("pubuid").GetInt32();
+        // int pubuid = parameters.GetProperty("pubuid").GetInt32();
 
         JsonElement properties = parameters.GetProperty("properties");
         Dictionary<string, object>? propertiesDict = JsonSerializer.Deserialize<Dictionary<string, object>>(properties);
@@ -222,11 +235,13 @@ namespace NTClient
         {
           Id = id,
           Name = name,
-          PubUid = pubuid,
+          //PubUid = pubuid,
           Type = type,
           Properties = propertiesDict
         };
         serverTopics = serverTopics.Append(newTopic).ToArray();
+
+        Log($"serverTopics: {serverTopics.Length}");
       }
       catch (Exception e)
       {
@@ -345,6 +360,8 @@ namespace NTClient
             return;
           }
 
+          // Log($"Received JSON: {json}");
+
           if (method.GetString() == "announce")
           {
             HandleAnnounce(parameters);
@@ -419,17 +436,19 @@ namespace NTClient
           return;
         }
 
-        Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
-        if (serverTopics.Any(t => t.PubUid == topicId))
+        // Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
+        if (serverTopics.Any(t => t.Id == topicId))
         {
-          Log("in server topics");
+          // Log("in server topics");
+          serverTopics.First(t => t.Id == topicId).Value = dataValue;
+          
         }
         else if (topicId == -1)
         {
-          // handleRtt()
+          HandleRtt();
         }
         // Code block to handle valid data
-        Log($"Received binary data: {data[0]} {data[1]} {data[2]} {data[3]}");
+        // Log($"Received binary data: {data[0]} {data[1]} {data[2]} {data[3]}");
       }
       catch (Exception e)
       {

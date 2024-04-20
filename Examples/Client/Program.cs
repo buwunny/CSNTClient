@@ -9,7 +9,8 @@ class TestClient {
     client.Connect();
  
     // client.Subscribe([topic]);
-    client.Subscribe("");
+    client.Subscribe(["/datatable/x", "/datatable/y"]);
+		client.Subscribe(["/datatable/y"]);
     // client.Subscribe("/datatable/x");
 		
 		client.Publish("int", "TestTopic");
@@ -18,14 +19,15 @@ class TestClient {
 		int i = 0;
 		while (client.IsConnected)
 		{
+			Thread.Sleep(500);
 			client.UpdateTopic("TestTopic", i);
+			Console.WriteLine("values: " + client.GetTopicValue("/datatable/x") + " " + client.GetTopicValue("/datatable/y"));
 			i ++;
 			// client.SendTimestamp();
 			// Print the connection status
 			// Console.WriteLine("IsConnected: " + client.IsConnected);
       // client.SendTimestamp();
 			// Wait for half a second
-			Thread.Sleep(500);
 		}
 		// Keep the console open until a key is pressed
 		//Console.WriteLine("Press any key to exit...");

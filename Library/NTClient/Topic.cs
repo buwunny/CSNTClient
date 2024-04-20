@@ -5,6 +5,7 @@
     private string name = "";
     private int pubUid = -1;
     private string type = "string";
+    private object value = new();
     private Dictionary<string, object> properties = new Dictionary<string, object>();
 
     
@@ -41,6 +42,12 @@
     {
       get { return type; }
       set { type = value; }
+    }
+
+    public object Value
+    {
+      get { return value; }
+      set { this.value = value; }
     }
 
     public Dictionary<string, object> Properties
