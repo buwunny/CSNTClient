@@ -56,10 +56,28 @@ namespace NTClient
 
     public bool IsConnected => client?.State == WebSocketState.Open;
 
+    public void UpdateTopic(string topic, object value)
+    {
+      Topic? clientTopic = clientTopics.FirstOrDefault(t => t.Name == topic);
+      if (clientTopic == null)
+      {
+        Log($"Topic with name \"{topic}\" not found.");
+        return;
+      }
+      uint publisherId = (uint)clientTopic.PubUid;
+      int timestamp = (int)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
+      uint dataType = (uint)TypeLookup(clientTopic.Type);
+      var dataValue = value;
+      var txData = new object[] { publisherId, timestamp, dataType, value };
+
+      byte[] data = MessagePackSerializer.Serialize(txData);
+      SendBinary(data);
+    }
+
     private async Task WebsocketListener()
     {
       var buffer = new ArraySegment<byte>(new byte[1024]);
-      while (true)
+      while (IsConnected)
       {
         WebSocketReceiveResult result = await client.ReceiveAsync(buffer, default);
         if (result?.MessageType == WebSocketMessageType.Close)
@@ -79,10 +97,6 @@ namespace NTClient
           }
         }
       }
-    }
-
-    private async Task WebsocketSender()
-    {
     }
 
     // CLIENT -> SERVER
@@ -366,22 +380,6 @@ namespace NTClient
           return;
         }
 
-
-        Dictionary<int, Type> intToType = new()
-        {
-          { 0, typeof(bool) },
-          { 1, typeof(double) },
-          { 2, typeof(int) },
-          { 3, typeof(float) },
-          { 4, typeof(string) },
-          { 5, typeof(byte[]) },
-          { 16, typeof(bool[]) },
-          { 17, typeof(double[]) },
-          { 18, typeof(int[]) },
-          { 19, typeof(float[]) },
-          { 20, typeof(string[]) }
-        };
-
         int topicId;
         int timestamp;
         int dataType;
@@ -450,6 +448,25 @@ namespace NTClient
     {
       Random random = new();
       return random.Next(99999999);
+    }
+
+    private static int TypeLookup(string type)
+    {
+      Dictionary<string, int> typeToInt = new()
+      {
+        { "bool", 0 },
+        { "double", 1 },
+        { "int", 2 },
+        { "float", 3 },
+        { "string", 4 },
+        { "byte[]", 5 },
+        { "bool[]", 16 },
+        { "double[]", 17 },
+        { "int[]", 18 },
+        { "float[]", 19 },
+        { "string[]", 20 }
+      };
+      return typeToInt[type];
     }
   }
 }

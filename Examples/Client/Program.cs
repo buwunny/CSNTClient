@@ -15,11 +15,11 @@ class TestClient {
 		client.Publish("int", "TestTopic");
 		// client.SetProperties("TestTopic", new Dictionary<string, object> { { "retained", false } });
 		// client.Unpublish("TestTopic");
-		// int i = 0;
+		int i = 0;
 		while (client.IsConnected)
 		{
-			// client.set("TestTopic", i);
-			// i ++;
+			client.UpdateTopic("TestTopic", i);
+			i ++;
 			// client.SendTimestamp();
 			// Print the connection status
 			// Console.WriteLine("IsConnected: " + client.IsConnected);
