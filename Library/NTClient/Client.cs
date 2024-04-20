@@ -90,18 +90,21 @@ namespace NTClient
     // Publish Messages (Client to Server)
     public void Publish(string type, string topic)
     {
-      Topic newTopic = new Topic();
-      newTopic.Name = topic;
-      newTopic.PubUid = GetNewUID();
-      newTopic.Type = type;
+      Topic newTopic = new()
+      {
+        Name = topic,
+        PubUid = GetNewUID(),
+        Type = type
+      };
+
       SendJson("publish", newTopic.GetPublishObject());
-      clientTopics.Append(newTopic);
+      clientTopics = clientTopics.Append(newTopic).ToArray();
     }
+    // TODO: start sending values via msgpack after publish
 
     public void Unpublish(string topic)
     {
       Topic? newTopic = clientTopics.FirstOrDefault(t => t.Name == topic);
-
       if (newTopic == null)
       {
         Log($"Topic with name \"{topic}\" not found.");
@@ -109,6 +112,7 @@ namespace NTClient
       };
       SendJson("unpublish", newTopic.GetUnpublishObject());
     }
+    // TODO: stop sending values via msgpack after unpublish
 
     public void SetProperties(string topic, Dictionary<string, object> properties)
     {
@@ -187,11 +191,79 @@ namespace NTClient
     }
 
     // SERVER -> CLIENT
-    private void HandleAnnounce() {}
+    private void HandleAnnounce(JsonElement parameters)
+    {
+      try {
+        string? name = parameters.GetProperty("name").GetString();
+        int id = parameters.GetProperty("id").GetInt32();
+        string? type = parameters.GetProperty("type").GetString();
+        int pubuid = parameters.GetProperty("pubuid").GetInt32();
 
-    private void HandleUnannounce() {}
+        JsonElement properties = parameters.GetProperty("properties");
+        Dictionary<string, object>? propertiesDict = JsonSerializer.Deserialize<Dictionary<string, object>>(properties);
+        
+        //public Topic(string name, int uid, string type, Dictionary<string, object> properties)
+        if (type == null || name == null || propertiesDict == null) { return; }
+        Topic newTopic = new()
+        {
+          Id = id,
+          Name = name,
+          PubUid = pubuid,
+          Type = type,
+          Properties = propertiesDict
+        };
+        serverTopics = serverTopics.Append(newTopic).ToArray();
+      }
+      catch (Exception e)
+      {
+        Log($"ERROR: Failed to parse announce: {e.Message}");
+        return;
+      }
+    }
 
-    private void HandleProperties() {}
+    private void HandleUnannounce(JsonElement parameters) 
+    {
+      string? name = parameters.GetProperty("name").GetString();
+      JsonElement id = parameters.GetProperty("id");
+      Topic? topic = serverTopics.FirstOrDefault(t => t.Name == name);
+      if (topic != null)
+      {
+        serverTopics = serverTopics.Where(t => t.Name != name).ToArray();
+      }
+      else
+      {
+        Log($"Topic with name \"{name}\" not found.");
+      }
+    }
+
+    private void HandleProperties(JsonElement parameters)
+    {
+      try
+      {
+        string? name = parameters.GetProperty("name").GetString();
+        Topic? topic = serverTopics.FirstOrDefault(t => t.Name == name);
+        
+        JsonElement update = parameters.GetProperty("update");
+        Dictionary<string, object>? propertyDict = JsonSerializer.Deserialize<Dictionary<string, object>>(update);
+        if (topic == null || propertyDict == null) { return; }
+        foreach (KeyValuePair<string, object> kvp in propertyDict)
+        {
+          if (kvp.Value == null)
+          {
+            topic.Properties.Remove(kvp.Key);
+          }
+          else if (topic.Properties.ContainsKey(kvp.Key))
+          {
+            topic.Properties[kvp.Key] = kvp.Value;
+          }
+        }
+      }
+      catch (Exception e)
+      {
+        Log($"ERROR: Failed to parse properties: {e.Message}");
+        return;
+      }
+    }
 
     private void HandleRtt() {}
 
@@ -259,42 +331,18 @@ namespace NTClient
             return;
           }
 
-          // TODO: Handle different methods
-          // if (method.GetString() == "announce")
-          // {
-          //   string? name = parameters.GetProperty("name").GetString();
-          //   int id = parameters.GetProperty("id").GetInt32();
-          //   string? type = parameters.GetProperty("type").GetString();
-          //   int pubUid = parameters.TryGetProperty("pubuid", out JsonElement pubUidElement) ? pubUidElement.GetInt32() : 0;
-          //   Dictionary<string, object>? properties = JsonSerializer.Deserialize<Dictionary<string, object>>(parameters.GetProperty("properties").GetRawText());
-            
-          //   if (name is null || type is null || properties is null)
-          //   {
-          //     Log("Ignoring message: JSON does not contain a valid \"name\", \"type\", or \"properties\" key.");
-          //     return;
-          //   }
-          //   Topic announcedTopic = new Topic(name, pubUid, type, properties);
-
-          //   serverTopics[parameters.GetProperty("id").GetInt32()] = announcedTopic;
-          // }
-          // else if (method.GetString() == "unannounce")
-          // {
-
-          //   int id = parameters.GetProperty("id").GetInt32();
-          //   if (serverTopics.Any(topic => topic.ServerTopicId == id))
-          //   {
-          //     // Code to handle when a topic with the given id exists in serverTopics
-          //     serverTopics.(id);
-          //   }
-          //   else
-          //   {
-          //     Log($"Ignoring message: serverTopic with ID {id} not found.");
-          //   }
-          // }
-          // else if (method.GetString() == "properties")
-          // {
-            
-          // }
+          if (method.GetString() == "announce")
+          {
+            HandleAnnounce(parameters);
+          }
+          else if (method.GetString() == "unannounce")
+          {
+            HandleUnannounce(parameters);
+          }
+          else if (method.GetString() == "properties")
+          {
+            HandleProperties(parameters);
+          }
           Log($"Received JSON: {json}");
         }
       }

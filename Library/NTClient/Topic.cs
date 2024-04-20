@@ -8,7 +8,7 @@
     private Dictionary<string, object> properties = new Dictionary<string, object>();
 
     
-    public Topic(string name , int uid, string type, Dictionary<string, object> properties)
+    public Topic(string name, int uid, string type, Dictionary<string, object> properties)
     {
       this.name = name;
       this.pubUid = uid;

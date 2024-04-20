@@ -12,9 +12,14 @@ class TestClient {
     client.Subscribe("");
     // client.Subscribe("/datatable/x");
 		
-		client.Publish("string", "TestTopic");
+		client.Publish("int", "TestTopic");
+		// client.SetProperties("TestTopic", new Dictionary<string, object> { { "retained", false } });
+		// client.Unpublish("TestTopic");
+		// int i = 0;
 		while (client.IsConnected)
 		{
+			// client.set("TestTopic", i);
+			// i ++;
 			// client.SendTimestamp();
 			// Print the connection status
 			// Console.WriteLine("IsConnected: " + client.IsConnected);
