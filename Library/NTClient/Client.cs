@@ -13,6 +13,9 @@ namespace NTClient
     private readonly string name = "NT4";
     private readonly ClientWebSocket client;
 
+    private readonly int timeout = 3;
+    private long lastPing = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
     private Topic[] clientTopics = [];
     private Topic[] serverTopics = [];
     // {serverTopicID : Topic}
@@ -39,7 +42,9 @@ namespace NTClient
         return;
       }
       Log("Connected to server.");
-      await WebsocketListener();
+      // AlivenessCheck();
+      // await WebsocketListener();
+      await Task.WhenAll(AlivenessCheck(), WebsocketListener());
     }
 
     public void Disconnect()
@@ -65,7 +70,7 @@ namespace NTClient
         return;
       }
       uint publisherId = (uint)clientTopic.PubUid;
-      int timestamp = (int)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
+      long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
       uint dataType = (uint)TypeLookup(clientTopic.Type);
       var dataValue = value;
       var txData = new object[] { publisherId, timestamp, dataType, value };
@@ -108,6 +113,22 @@ namespace NTClient
             HandleBinary(buffer.Array);
           }
         }
+      }
+    }
+
+    private async Task AlivenessCheck()
+    {
+      while (IsConnected)
+      {
+        if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - lastPing > timeout)
+        {
+          Log("Connection timed out.");
+          Disconnect();
+          break;
+        }
+        await Task.Delay(1000);
+        SendTimestamp();
+        lastPing = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
       }
     }
 
@@ -178,12 +199,20 @@ namespace NTClient
       subscribers = subscribers.Where(s => s.Uid != uid).ToArray();
     }
 
-    private void SendTimestamp()
+    public void SendTimestamp()
     {
       long time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
       var txData = new object[] { -1, 0, 1, time };
       byte[] encodedData = MessagePackSerializer.Serialize(txData);
       SendBinary(encodedData);
+      Log($"Sent timestamp: {time}");
+    }
+
+    public long timeOffset;
+    public void HandleTimestamp(long timestamp)
+    {
+      long time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
+      timeOffset = time - timestamp;
     }
 
     private void SendJson(string method, object parameters)
@@ -389,7 +418,7 @@ namespace NTClient
       try
       {
         object[] data = MessagePackSerializer.Deserialize<object[]>(bytes);
-        
+
         // Validate MessagePack data
         if (data.Length != 4)
         {
@@ -398,7 +427,7 @@ namespace NTClient
         }
 
         int topicId;
-        int timestamp;
+        long timestamp;
         int dataType;
         var dataValue = data[3];
 
@@ -416,9 +445,13 @@ namespace NTClient
           return;
         }
 
-        if (data[1] is uint uintTimestamp)
+        if (data[1] is UInt64 uintTimestamp)
         {
-          timestamp = (int)uintTimestamp;
+          timestamp = (long)uintTimestamp;
+        }
+        else if (data[1] is UInt32 intTimestamp)
+        {
+          timestamp = intTimestamp;
         }
         else
         {
@@ -436,7 +469,7 @@ namespace NTClient
           return;
         }
 
-        // Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
+        Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
         if (serverTopics.Any(t => t.Id == topicId))
         {
           // Log("in server topics");
@@ -445,7 +478,7 @@ namespace NTClient
         }
         else if (topicId == -1)
         {
-          HandleRtt();
+          HandleTimestamp(timestamp);
         }
         // Code block to handle valid data
         // Log($"Received binary data: {data[0]} {data[1]} {data[2]} {data[3]}");

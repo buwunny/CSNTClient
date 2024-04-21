@@ -8,12 +8,12 @@ class TestClient {
 		// Connect the client
     client.Connect();
  
-    // client.Subscribe([topic]);
-    client.Subscribe(["/datatable/x", "/datatable/y"]);
+    // client.Subscribe(["/datatable/y", "/datatable/x"]);
 		client.Subscribe(["/datatable/y"]);
-    // client.Subscribe("/datatable/x");
+    client.Subscribe(["/datatable/x"]);
 		
 		client.Publish("int", "TestTopic");
+    // client.Subscribe(["TestTopic"]);
 		// client.SetProperties("TestTopic", new Dictionary<string, object> { { "retained", false } });
 		// client.Unpublish("TestTopic");
 		int i = 0;
@@ -21,7 +21,8 @@ class TestClient {
 		{
 			Thread.Sleep(500);
 			client.UpdateTopic("TestTopic", i);
-			Console.WriteLine("values: " + client.GetTopicValue("/datatable/x") + " " + client.GetTopicValue("/datatable/y"));
+			// client.SendTimestamp();
+			// Console.WriteLine("values: " + client.GetTopicValue("/datatable/x") + " " + client.GetTopicValue("/datatable/y"));
 			i ++;
 			// client.SendTimestamp();
 			// Print the connection status
