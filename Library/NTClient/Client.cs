@@ -42,8 +42,7 @@ namespace NTClient
         return;
       }
       Log("Connected to server.");
-      // AlivenessCheck();
-      // await WebsocketListener();
+
       await Task.WhenAll(AlivenessCheck(), WebsocketListener());
     }
 
@@ -106,11 +105,27 @@ namespace NTClient
         {
           if (result?.MessageType == WebSocketMessageType.Text)
           {
-            HandleJson(buffer.Array, result.Count);
+            string text = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
+            JsonDocument jsonDocument = JsonDocument.Parse(text);
+            HandleJson(jsonDocument);
           }
           else if (result?.MessageType == WebSocketMessageType.Binary)
           {
-            HandleBinary(buffer.Array);
+            using var stream = new MemoryStream(buffer.Array, 0, result.Count);
+            using var reader = new MessagePackStreamReader(stream);
+            while (true)
+            {
+              var message = await reader.ReadAsync(default);
+              if (message.HasValue)
+              {
+                object[] data = MessagePackSerializer.Deserialize<object[]>(message.Value, MessagePackSerializerOptions.Standard);
+                HandleBinary(data);
+              }
+              else
+              {
+                break;
+              }
+            }
           }
         }
       }
@@ -134,7 +149,6 @@ namespace NTClient
 
     // CLIENT -> SERVER
 
-    // Publish Messages (Client to Server)
     public void Publish(string type, string topic)
     {
       Topic newTopic = new()
@@ -147,7 +161,6 @@ namespace NTClient
       SendJson("publish", newTopic.GetPublishObject());
       clientTopics = clientTopics.Append(newTopic).ToArray();
     }
-    // TODO: start sending values via msgpack after publish
 
     public void Unpublish(string topic)
     {
@@ -157,9 +170,9 @@ namespace NTClient
         Log($"Topic with name \"{topic}\" not found.");
         return;
       };
+      clientTopics = clientTopics.Where(t => t.Name != topic).ToArray();
       SendJson("unpublish", newTopic.GetUnpublishObject());
     }
-    // TODO: stop sending values via msgpack after unpublish
 
     public void SetProperties(string topic, Dictionary<string, object> properties)
     {
@@ -180,9 +193,9 @@ namespace NTClient
     {
       if (client == null) return;
       Subscriber sub = new Subscriber(topics, GetNewUID(), new SubscriptionOptions());
-      subscribers.Append(sub);
+      subscribers = subscribers.Append(sub).ToArray();
       SendJson("subscribe", sub.GetSubscribeObject());
-      Log("Subscribed to topic(s): \"" + string.Join(", ", topics) + "\"");
+      // Log("Subscribed to topic(s): \"" + string.Join(", ", topics) + "\"");
     }
 
     public void Unsubscribe(int uid)
@@ -205,7 +218,7 @@ namespace NTClient
       var txData = new object[] { -1, 0, 1, time };
       byte[] encodedData = MessagePackSerializer.Serialize(txData);
       SendBinary(encodedData);
-      Log($"Sent timestamp: {time}");
+      // Log($"Sent timestamp: {time}");
     }
 
     public long timeOffset;
@@ -269,8 +282,6 @@ namespace NTClient
           Properties = propertiesDict
         };
         serverTopics = serverTopics.Append(newTopic).ToArray();
-
-        Log($"serverTopics: {serverTopics.Length}");
       }
       catch (Exception e)
       {
@@ -325,13 +336,10 @@ namespace NTClient
 
     private void HandleRtt() {}
 
-    private void HandleJson (byte[] bytes, int count)
+    private void HandleJson (JsonDocument jsonDocument)
     {
       try 
       {
-        string text = Encoding.UTF8.GetString(bytes, 0, count);
-        JsonDocument jsonDocument = JsonDocument.Parse(text);
-        
         if (jsonDocument.RootElement.ValueKind != JsonValueKind.Array)
         {
           Log("Ignoring message: Recieved a non-array of JSON objects.");
@@ -413,12 +421,10 @@ namespace NTClient
       }
     }
 
-    private void HandleBinary (byte[] bytes)
+    private void HandleBinary (object[] data)
     {
       try
       {
-        object[] data = MessagePackSerializer.Deserialize<object[]>(bytes);
-
         // Validate MessagePack data
         if (data.Length != 4)
         {
@@ -469,7 +475,7 @@ namespace NTClient
           return;
         }
 
-        Log($"{topicId}, {timestamp}, {dataType}, {dataValue}");
+        //Log($"Recieved Binary: {topicId}, {timestamp}, {dataType}, {dataValue}");
         if (serverTopics.Any(t => t.Id == topicId))
         {
           // Log("in server topics");
