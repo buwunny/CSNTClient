@@ -68,6 +68,11 @@ namespace NTClient
         Log($"Topic with name \"{topic}\" not found.");
         return;
       }
+      Topic? serverTopic = serverTopics.FirstOrDefault(t => t.Name == topic);
+      if (serverTopic != null)
+      {
+        serverTopic.Value = value;
+      }
       uint publisherId = (uint)clientTopic.PubUid;
       long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1000;
       uint dataType = (uint)TypeLookup(clientTopic.Type);
@@ -444,6 +449,30 @@ namespace NTClient
         else if (data[0] is byte byteTopicId)
         {
           topicId = byteTopicId;
+        }
+        else if (data[0] is short shortTopicId)
+        {
+          topicId = shortTopicId;
+        }
+        else if (data[0] is ushort ushortTopicId)
+        {
+          topicId = ushortTopicId;
+        }
+        else if (data[0] is int intTopicId)
+        {
+          topicId = intTopicId;
+        }
+        else if (data[0] is uint uintTopicId)
+        {
+          topicId = (int)uintTopicId;
+        }
+        else if (data[0] is long longTopicId)
+        {
+          topicId = (int)longTopicId;
+        }
+        else if (data[0] is ulong ulongTopicId)
+        {
+          topicId = (int)ulongTopicId;
         }
         else
         {
